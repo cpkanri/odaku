@@ -39,6 +39,11 @@ h1{font-size:17px;margin:0;letter-spacing:.02em;font-weight:700}
 .period input{width:54px;text-align:right}
 
 .toolbar{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 13px;box-shadow:var(--shadow);margin-bottom:12px}
+.statusbar{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:9px 13px;box-shadow:var(--shadow);margin-bottom:10px}
+.toolbar.collapsible{overflow:hidden;transition:max-height .22s ease,padding .22s ease,margin .22s ease,border-width .22s ease}
+.toolbar.collapsible.collapsed{max-height:0;padding-top:0;padding-bottom:0;margin-bottom:0;border-width:0}
+.ghost.tgl{font-weight:700;border-color:var(--accent);color:var(--accent-d)}
+.ghost.tgl.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .tool{display:flex;align-items:center;gap:8px}
 .tool .lab{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.02em}
 .seg{display:inline-flex;background:var(--line2);border-radius:9px;padding:3px;gap:2px}
@@ -203,7 +208,17 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     </div>
   </div>
 
-  <div class="toolbar">
+  <div class="statusbar">
+    <button class="ghost tgl" id="toolToggle">⚙ 入力設定 ▾</button>
+    <div class="tool synctool"><span class="syncdot" id="syncDot"></span><span id="syncLab" class="hint">ローカル</span></div>
+    <span class="whoami" id="whoami"></span>
+    <div class="spacer"></div>
+    <button class="ghost" id="adminBtn" style="display:none">ユーザー管理</button>
+    <button class="ghost" id="syncNow">同期</button>
+    <button class="ghost" id="logoutBtn" style="display:none">ログアウト</button>
+  </div>
+
+  <div class="toolbar collapsible collapsed" id="toolbar">
     <div class="tool">
       <span class="lab">移動方向</span>
       <div class="seg dir" id="dirSeg">
@@ -220,11 +235,6 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     </div>
     <span class="hint">Enterで設定方向に移動／Tab=右／↑↓←→</span>
     <div class="spacer"></div>
-    <div class="tool synctool"><span class="syncdot" id="syncDot"></span><span id="syncLab" class="hint">ローカル</span></div>
-    <span class="whoami" id="whoami"></span>
-    <button class="ghost" id="adminBtn" style="display:none">ユーザー管理</button>
-    <button class="ghost" id="syncNow">同期</button>
-    <button class="ghost" id="logoutBtn" style="display:none">ログアウト</button>
     <button class="ghost" id="saveJson">下書き保存</button>
     <button class="ghost" id="loadJson">読込</button>
     <button class="ghost warn" id="clearOne">月クリア</button>
@@ -362,7 +372,7 @@ function renderTabs(){
     const n=filledDays(state.fy,p.key,state.month);
     const b=document.createElement('button');
     b.className='tab'+(p.key===state.plant?' on':'');
-    b.innerHTML=`${p.key}${p.isNew?'<span class="nw">新</span>':''}<span class="cnt${n?'':' zero'}">${n}</span>`;
+    b.innerHTML=`${p.key}<span class="cnt${n?'':' zero'}">${n}</span>`;
     b.onclick=()=>{state.plant=p.key;renderPanel();renderTabs();};
     wrap.appendChild(b);
   });
@@ -756,6 +766,8 @@ $('#selClear').addEventListener('click',()=>{selSet.clear();renderSelChips();});
 function setExportBar(open){const bar=$('#exportbar'),fab=$('#exFab');bar.classList.toggle('open',open);fab.classList.toggle('hide',open);}
 $('#exFab').addEventListener('click',()=>setExportBar(true));
 $('#barClose').addEventListener('click',()=>setExportBar(false));
+// 入力設定（移動方向・負荷量・保存等）の開閉
+$('#toolToggle').addEventListener('click',()=>{const tb=$('#toolbar'),btn=$('#toolToggle');const open=tb.classList.contains('collapsed');tb.classList.toggle('collapsed',!open);btn.classList.toggle('on',open);btn.textContent=open?'⚙ 入力設定 ▴':'⚙ 入力設定 ▾';});
 // 出力実行後はスマホでは自動で閉じる（入力に戻りやすく）
 ['#exAll','#exSel','#exSummary'].forEach(id=>$(id).addEventListener('click',()=>{if(window.innerWidth<820)setTimeout(()=>setExportBar(false),300);}));
 const selSet=new Set();
@@ -776,7 +788,7 @@ async function startApp(){
   syncControls();
   if(state.plant&&state.plant!=='__sum__')selSet.add(state.plant);else selSet.add(PLANTS[0].key);
   renderTabs();renderSelChips();renderPanel();renderVStat();
-  setExportBar(window.innerWidth>=820);
+  setExportBar(false);
   applyUserUI();
   if('serviceWorker' in navigator){try{await navigator.serviceWorker.register('sw.js');}catch(e){}}
   if(!HAS_BACKEND){setSync('local');showLogin();return;}            // サーバー未設定: ローカル単体
