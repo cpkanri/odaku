@@ -93,6 +93,17 @@ h1{font-size:17px;margin:0;letter-spacing:.02em;font-weight:700}
 .ufrm-row input,.ufrm-row select{flex:1 1 140px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--jp);background:#fff}
 
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
+.plantbar{position:relative}
+.plant-toggle{display:none;width:100%;align-items:center;justify-content:space-between;border:1px solid var(--line);background:#fff;color:var(--accent-d);font-family:var(--jp);font-weight:700;font-size:14px;padding:11px 16px;border-radius:11px;cursor:pointer;box-shadow:var(--shadow)}
+.plant-toggle .caret{color:var(--muted);transition:transform .18s}
+.plantbar.open .plant-toggle .caret{transform:rotate(180deg)}
+.meta-head{display:flex;align-items:center;gap:10px;padding:8px 14px;flex-wrap:wrap;border-bottom:1px solid var(--line2)}
+.meta-title{font-size:11px;font-weight:700;color:var(--muted)}
+.meta-summary{font-size:12.5px;font-weight:600;color:var(--ink);flex:1 1 auto;min-width:120px}
+.meta-summary .code{font-family:var(--mono);letter-spacing:.03em}
+.mini2{font-size:11.5px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--accent-d);border-radius:7px;padding:4px 10px;cursor:pointer}
+.mini2.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.meta-collapse{display:none}
 .tab{position:relative;border:1px solid var(--line);border-bottom:0;background:#dfe8ea;color:var(--muted);font-family:var(--jp);font-weight:700;font-size:13px;padding:9px 13px 10px;border-radius:10px 10px 0 0;cursor:pointer;transition:.12s;display:flex;align-items:center;gap:7px}
 .tab:hover{background:#e9f0f1;color:var(--ink)}
 .tab.on{background:var(--panel);color:var(--accent-d);box-shadow:0 -2px 0 var(--accent) inset}
@@ -109,6 +120,7 @@ h1{font-size:17px;margin:0;letter-spacing:.02em;font-weight:700}
 .meta .cell:last-child{border-right:0}
 .meta .k{font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.03em;margin-bottom:3px}
 .meta input{width:100%;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-family:var(--jp);font-size:14px;color:var(--ink);background:#fff}
+.meta input:read-only{background:#f3f6f7;color:#5d747c;border-color:var(--line2);cursor:default}
 .meta input.code{font-family:var(--mono);letter-spacing:.04em}
 .meta input.miss{border-color:var(--warn-b);background:#fffbeb}
 .metanote{font-size:11px;color:var(--warn-b);padding:6px 14px;background:#fffbeb;border-bottom:1px solid var(--line2);display:none}
@@ -187,6 +199,14 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.err{background:var(--danger)}
 @media (max-width:680px){.meta .cell{flex:1 1 50%}td input{min-width:54px}}
+@media (max-width:819px){
+  .plant-toggle{display:flex}
+  .plantbar:not(.open) .tabs{display:none}
+  .plantbar.open .tabs{margin-top:7px}
+  .tab{border-bottom:1px solid var(--line);border-radius:9px}
+  .meta-collapse{display:inline-flex}
+  .meta.collapsed{display:none}
+}
 </style>
 </head>
 <body>
@@ -241,7 +261,10 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     <input type="file" id="jsonFile" accept=".json" style="display:none">
   </div>
 
-  <div class="tabs" id="tabs"></div>
+  <div class="plantbar" id="plantbar">
+    <button class="plant-toggle" id="plantToggle"><span id="plantToggleName">処理場</span><span class="caret">▾</span></button>
+    <div class="tabs" id="tabs"></div>
+  </div>
 
   <div class="panel" id="panel"></div>
 </div>
@@ -366,20 +389,23 @@ const $=s=>document.querySelector(s);
 const fmt=v=>v==null?'—':Math.round(v).toLocaleString('ja-JP');
 
 function buildMonthSelect(){const sel=$('#month');sel.innerHTML='';FYMONTHS.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m+'月';if(m===state.month)o.selected=true;sel.appendChild(o);});}
+function plantLabel(){return state.plant==='__sum__'?'集計（水量）':state.plant;}
+function closePlantbar(){const pb=$('#plantbar');if(pb)pb.classList.remove('open');}
 function renderTabs(){
+  const tn=$('#plantToggleName');if(tn)tn.textContent=plantLabel();
   const wrap=$('#tabs');wrap.innerHTML='';
   PLANTS.forEach(p=>{
     const n=filledDays(state.fy,p.key,state.month);
     const b=document.createElement('button');
     b.className='tab'+(p.key===state.plant?' on':'');
     b.innerHTML=`${p.key}<span class="cnt${n?'':' zero'}">${n}</span>`;
-    b.onclick=()=>{state.plant=p.key;renderPanel();renderTabs();};
+    b.onclick=()=>{state.plant=p.key;closePlantbar();renderPanel();renderTabs();};
     wrap.appendChild(b);
   });
   const s=document.createElement('button');
   s.className='tab sum'+(state.plant==='__sum__'?' on':'');
   s.innerHTML='集計（水量）';
-  s.onclick=()=>{state.plant='__sum__';renderPanel();renderTabs();};
+  s.onclick=()=>{state.plant='__sum__';closePlantbar();renderPanel();renderTabs();};
   wrap.appendChild(s);
 }
 function renderPanel(){
@@ -390,13 +416,20 @@ function renderPanel(){
 }
 function renderPlant(){
   const p=PLANTS.find(x=>x.key===state.plant);const m=getMeta(p);
+  const isAdmin=!!(SESSION&&SESSION.user&&SESSION.user.role==='admin');
   const panel=$('#panel');
   panel.innerHTML=`
-   <div class="metanote ${p.isNew&&!m.code?'show':''}" id="metanote">この処理場は新規追加です。事業場コード（10桁）を入力してください。</div>
-   <div class="meta">
-     <div class="cell"><div class="k">事業場コード（10桁）</div><input class="code ${p.isNew&&!m.code?'miss':''}" id="mi-code" value="${esc(m.code)}" placeholder="未入力" inputmode="numeric"></div>
-     <div class="cell"><div class="k">工場・事業場名</div><input id="mi-name" value="${esc(m.name)}"></div>
-     <div class="cell"><div class="k">記入者名</div><input id="mi-writer" value="${esc(m.writer)}"></div>
+   <div class="metanote ${p.isNew&&!m.code?'show':''}" id="metanote">この処理場は新規追加です。管理者で「✏ 編集」から事業場コード（10桁）を入力してください。</div>
+   <div class="meta-head">
+     <span class="meta-title">事業場情報</span>
+     <span class="meta-summary"><span class="code">${esc(m.code)||'コード未入力'}</span>　／　${esc(m.name)}　／　${esc(m.writer)}</span>
+     ${isAdmin?'<button class="mini2" id="metaEdit">✏ 編集</button>':''}
+     <button class="mini2 meta-collapse" id="metaCollapse">詳細 ▾</button>
+   </div>
+   <div class="meta collapsed" id="metaFields">
+     <div class="cell"><div class="k">事業場コード（10桁）</div><input class="code ${p.isNew&&!m.code?'miss':''}" id="mi-code" value="${esc(m.code)}" placeholder="未入力" inputmode="numeric" readonly></div>
+     <div class="cell"><div class="k">工場・事業場名</div><input id="mi-name" value="${esc(m.name)}" readonly></div>
+     <div class="cell"><div class="k">記入者名</div><input id="mi-writer" value="${esc(m.writer)}" readonly></div>
    </div>
    <div class="grid-scroll"><table id="grid">
      <thead>
@@ -415,6 +448,16 @@ function renderPlant(){
   $('#mi-code').addEventListener('input',e=>{setMeta(p,'code',e.target.value);});
   $('#mi-name').addEventListener('input',e=>{setMeta(p,'name',e.target.value);renderTabs();});
   $('#mi-writer').addEventListener('input',e=>{setMeta(p,'writer',e.target.value);});
+  // 詳細の開閉（スマホ）
+  const mc=$('#metaCollapse');if(mc)mc.addEventListener('click',()=>{const f=$('#metaFields');const open=f.classList.contains('collapsed');f.classList.toggle('collapsed',!open);mc.textContent=open?'詳細 ▴':'詳細 ▾';});
+  // 編集ロック解除（管理者のみ）
+  const me=$('#metaEdit');
+  if(me)me.addEventListener('click',()=>{
+    const ro=$('#mi-code').readOnly;
+    ['#mi-code','#mi-name','#mi-writer'].forEach(s=>{$(s).readOnly=!ro;});
+    me.classList.toggle('on',ro);me.textContent=ro?'🔒 完了':'✏ 編集';
+    if(ro){$('#metaFields').classList.remove('collapsed');if(mc)mc.textContent='詳細 ▴';$('#mi-code').focus();}
+  });
   renderGrid();
 }
 function setMeta(p,k,v){state.meta[p.key]=state.meta[p.key]||{};state.meta[p.key][k]=v;
@@ -766,6 +809,7 @@ $('#selClear').addEventListener('click',()=>{selSet.clear();renderSelChips();});
 function setExportBar(open){const bar=$('#exportbar'),fab=$('#exFab');bar.classList.toggle('open',open);fab.classList.toggle('hide',open);}
 $('#exFab').addEventListener('click',()=>setExportBar(true));
 $('#barClose').addEventListener('click',()=>setExportBar(false));
+$('#plantToggle').addEventListener('click',()=>$('#plantbar').classList.toggle('open'));
 // 入力設定（移動方向・負荷量・保存等）の開閉
 $('#toolToggle').addEventListener('click',()=>{const tb=$('#toolbar'),btn=$('#toolToggle');const open=tb.classList.contains('collapsed');tb.classList.toggle('collapsed',!open);btn.classList.toggle('on',open);btn.textContent=open?'⚙ 入力設定 ▴':'⚙ 入力設定 ▾';});
 // 出力実行後はスマホでは自動で閉じる（入力に戻りやすく）
