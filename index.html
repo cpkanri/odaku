@@ -164,6 +164,9 @@ table.sum td.num{text-align:right;font-family:var(--mono);cursor:pointer}
 table.sum td.num:hover{background:var(--accent-w)}
 table.sum td.num.zero{color:#b6c4c8}
 table.sum td.yr{text-align:right;font-family:var(--mono);font-weight:700;background:#e7f1ec;color:var(--accent-d)}
+table.sum td.st{text-align:right;font-family:var(--mono);background:#f3f7f8;color:#37606a}
+table.sum td.st.zero{color:#b6c4c8}
+table.sum th.st{background:#e8eff0}
 table.sum tfoot td{background:#eef4f5;font-weight:700;text-align:right;font-family:var(--mono);color:var(--accent-d);position:sticky;bottom:0}
 table.sum tfoot td.lab{text-align:center;font-family:var(--jp)}
 table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
@@ -295,12 +298,14 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     <div class="auth-mark"></div>
     <h2>汚濁負荷量 共有アプリ</h2>
     <p class="auth-sub">担当者IDとパスワードでログイン</p>
-    <label>担当者ID</label>
-    <input id="loginId" autocomplete="username" autocapitalize="off" spellcheck="false">
-    <label>パスワード</label>
-    <input id="loginPw" type="password" autocomplete="current-password">
-    <div class="auth-err" id="loginErr"></div>
-    <button class="btn primary auth-btn" id="loginBtn">ログイン</button>
+    <form id="loginForm" autocomplete="on">
+      <label for="loginId">担当者ID</label>
+      <input id="loginId" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label for="loginPw">パスワード</label>
+      <input id="loginPw" name="password" type="password" autocomplete="current-password">
+      <div class="auth-err" id="loginErr"></div>
+      <button type="submit" class="btn primary auth-btn" id="loginBtn">ログイン</button>
+    </form>
     <div class="auth-note" id="authNote"></div>
   </div>
 </div>
@@ -378,6 +383,14 @@ function waterSum(fy,plant,month){
   return has?s:null;
 }
 function yearWaterSum(fy,plant){let s=0,has=false;FYMONTHS.forEach(m=>{const v=waterSum(fy,plant,m);if(v!=null){s+=v;has=true;}});return has?s:null;}
+function yearWaterStats(fy,plant){
+  // 年度内で入力のある全日の水量(日量)を母数に 平均/最小/最大 を算出（未入力日は除外）
+  const vals=[];
+  FYMONTHS.forEach(m=>{const recs=getRecs(fy,plant,m);const dim=daysInMonth(monthYear(fy,m),m);for(let d=0;d<dim;d++){const v=parseFloat(recs[d].E);if(isFinite(v))vals.push(v);}});
+  if(!vals.length)return null;
+  const sum=vals.reduce((a,b)=>a+b,0);
+  return {avg:sum/vals.length,min:Math.min(...vals),max:Math.max(...vals),count:vals.length};
+}
 function filledDays(fy,plant,month){const recs=getRecs(fy,plant,month);const dim=daysInMonth(monthYear(fy,month),month);let n=0;for(let d=0;d<dim;d++){if(FIELDS.some(f=>f.kind!=='load'&&(recs[d][f.col]??'')!==''))n++;}return n;}
 
 function autoLoad(rec,lc){const f=FIELDS.find(x=>x.col===lc);const flow=parseFloat(rec.E),conc=parseFloat(rec[f.conc]);if(isFinite(flow)&&flow>0&&isFinite(conc))return round(conc*flow/1000,f.dp);return null;}
@@ -388,6 +401,7 @@ function overLimit(rec,col){const lim=LIMIT[col];if(lim==null)return false;const
 
 const $=s=>document.querySelector(s);
 const fmt=v=>v==null?'—':Math.round(v).toLocaleString('ja-JP');
+const fmt1=v=>v==null?'·':v.toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1});
 
 function buildMonthSelect(){const sel=$('#month');sel.innerHTML='';FYMONTHS.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m+'月';if(m===state.month)o.selected=true;sel.appendChild(o);});}
 function plantLabel(){return state.plant==='__sum__'?'集計（水量）':state.plant;}
@@ -509,17 +523,18 @@ function focusCell(d,col){const row=$('#body').children[d];if(!row)return;let in
 
 function renderSummary(){
   const panel=$('#panel');const fy=state.fy;
-  let head='<tr><th>処理場</th><th>事業場コード</th>'+FYMONTHS.map(m=>`<th>${m}月</th>`).join('')+'<th>年度合計</th></tr>';
+  let head='<tr><th>処理場</th><th>事業場コード</th>'+FYMONTHS.map(m=>`<th>${m}月</th>`).join('')+'<th>年度合計</th><th class="st">日平均</th><th class="st">日最小</th><th class="st">日最大</th></tr>';
   let rows='';
   PLANTS.forEach(p=>{
-    const m=getMeta(p);const yr=yearWaterSum(fy,p.key);
+    const m=getMeta(p);const yr=yearWaterSum(fy,p.key);const st=yearWaterStats(fy,p.key);
     rows+=`<tr><td class="pl">${p.key}<span style="font-weight:400;color:var(--muted)"> ${esc(m.name)}</span></td><td class="code">${esc(m.code)||'—'}</td>`;
     FYMONTHS.forEach(mo=>{const v=waterSum(fy,p.key,mo);const cur=(p.key===state.lastPlant&&mo===state.month);rows+=`<td class="num${v==null?' zero':''}${cur?' cur':''}" data-p="${p.key}" data-m="${mo}">${v==null?'·':fmt(v)}</td>`;});
-    rows+=`<td class="yr">${yr==null?'·':fmt(yr)}</td></tr>`;
+    rows+=`<td class="yr">${yr==null?'·':fmt(yr)}</td>`;
+    rows+=`<td class="st${st?'':' zero'}">${st?fmt1(st.avg):'·'}</td><td class="st${st?'':' zero'}">${st?fmt1(st.min):'·'}</td><td class="st${st?'':' zero'}">${st?fmt1(st.max):'·'}</td></tr>`;
   });
   panel.innerHTML=`<div class="sumwrap">
     <div class="sumtitle">令和${fy}年度　水量集計（m³）</div>
-    <div class="sumsub">各処理場ごとの月別・年度の水量合計。セルをタップするとその月の入力へ移動します。日報シートとは別管理です。</div>
+    <div class="sumsub">各処理場ごとの月別・年度の水量合計。日平均・日最小・日最大は入力のある日の日量から算出（小数1桁）。セルをタップするとその月の入力へ移動します。日報シートとは別管理です。</div>
     <table class="sum"><thead>${head}</thead><tbody>${rows}</tbody></table>
   </div>`;
   panel.querySelectorAll('td.num').forEach(td=>td.addEventListener('click',()=>{state.plant=td.dataset.p;state.month=+td.dataset.m;buildMonthSelect();renderPanel();renderTabs();}));
@@ -538,8 +553,7 @@ $('#logoutBtn').addEventListener('click',async()=>{try{if(SESSION)await rawApi('
 $('#adminBtn').addEventListener('click',openAdmin);
 $('#adminClose').addEventListener('click',()=>$('#adminModal').classList.remove('show'));
 $('#uSave').addEventListener('click',saveUser);
-$('#loginBtn').addEventListener('click',doLogin);
-$('#loginPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+$('#loginForm').addEventListener('submit',e=>{e.preventDefault();doLogin();});
 
 // ===== 認証UI =====
 function showLogin(){$('#authOverlay').classList.add('show');$('#authNote').textContent=HAS_BACKEND?'':'※config.js 未設定のためローカル単体で動作中';setTimeout(()=>$('#loginId')?.focus(),50);}
@@ -779,23 +793,27 @@ async function exportSummary(){
     const fy=state.fy;const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('水量集計',{views:[{state:'frozen',xSplit:2,ySplit:2}]});
     const FONT={name:'ＭＳ Ｐゴシック',size:11};
     const thin={style:'thin',color:{argb:'FFB9C9CE'}};const border={top:thin,left:thin,bottom:thin,right:thin};
-    ws.mergeCells(1,1,1,2+FYMONTHS.length+1);
+    const SC=3+FYMONTHS.length; // 年度合計の列番号
+    ws.mergeCells(1,1,1,SC+3);
     const t=ws.getCell(1,1);t.value=`令和${fy}年度　水量集計（m³）`;t.font={name:FONT.name,size:13,bold:true};t.alignment={vertical:'middle'};
     ws.getRow(1).height=24;
-    const hdr=['処理場','事業場コード',...FYMONTHS.map(m=>m+'月'),'年度合計'];
+    const hdr=['処理場','事業場コード',...FYMONTHS.map(m=>m+'月'),'年度合計','日平均','日最小','日最大'];
     const hrow=ws.getRow(2);hrow.values=hdr;hrow.height=20;
     hrow.eachCell(c=>{c.font={name:FONT.name,size:11,bold:true};c.alignment={horizontal:'center',vertical:'middle'};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE7F1EC'}};c.border=border;});
     let r=3;const firstDataRow=3;
     PLANTS.forEach(p=>{
-      const m=getMeta(p);const row=ws.getRow(r);
+      const m=getMeta(p);const row=ws.getRow(r);const st=yearWaterStats(fy,p.key);
       row.getCell(1).value=p.name||p.key;row.getCell(2).value=m.code||'';
       FYMONTHS.forEach((mo,ci)=>{const v=waterSum(fy,p.key,mo);const cell=row.getCell(3+ci);cell.value=(v==null?null:Math.round(v));});
       const c1=ws.getColumn(3).letter,c2=ws.getColumn(2+FYMONTHS.length).letter;
-      row.getCell(3+FYMONTHS.length).value={formula:`SUM(${c1}${r}:${c2}${r})`};
-      row.eachCell({includeEmpty:true},(c,cn)=>{c.font=FONT;c.border=border;if(cn===1)c.alignment={horizontal:'left'};else if(cn===2){c.alignment={horizontal:'left'};c.numFmt='@';}else{c.alignment={horizontal:'right'};c.numFmt='#,##0';}if(cn===3+FYMONTHS.length)c.font={name:FONT.name,size:11,bold:true};});
+      row.getCell(SC).value={formula:`SUM(${c1}${r}:${c2}${r})`};
+      row.getCell(SC+1).value=st?Math.round(st.avg*10)/10:null;
+      row.getCell(SC+2).value=st?Math.round(st.min*10)/10:null;
+      row.getCell(SC+3).value=st?Math.round(st.max*10)/10:null;
+      row.eachCell({includeEmpty:true},(c,cn)=>{c.font=FONT;c.border=border;if(cn===1)c.alignment={horizontal:'left'};else if(cn===2){c.alignment={horizontal:'left'};c.numFmt='@';}else{c.alignment={horizontal:'right'};c.numFmt=(cn>=SC+1)?'#,##0.0':'#,##0';}if(cn===SC)c.font={name:FONT.name,size:11,bold:true};});
       r++;
     });
-    ws.getColumn(1).width=20;ws.getColumn(2).width=14;for(let ci=0;ci<FYMONTHS.length;ci++)ws.getColumn(3+ci).width=8.5;ws.getColumn(3+FYMONTHS.length).width=11;
+    ws.getColumn(1).width=20;ws.getColumn(2).width=14;for(let ci=0;ci<FYMONTHS.length;ci++)ws.getColumn(3+ci).width=8.5;ws.getColumn(SC).width=11;ws.getColumn(SC+1).width=9.5;ws.getColumn(SC+2).width=9.5;ws.getColumn(SC+3).width=9.5;
     const buf=await wb.xlsx.writeBuffer();dl(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`令和${fy}年度_水量集計.xlsx`);
     toast('年度 水量集計を出力しました');
   }catch(e){console.error(e);toast('集計出力に失敗しました',true);}
