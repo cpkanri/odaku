@@ -235,6 +235,7 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     <div class="spacer"></div>
     <button class="ghost" id="adminBtn" style="display:none">ユーザー管理</button>
     <button class="ghost" id="syncNow">同期</button>
+    <button class="ghost" id="appUpdate">アプリ更新</button>
     <button class="ghost" id="logoutBtn" style="display:none">ログアウト</button>
   </div>
 
@@ -810,6 +811,14 @@ function setExportBar(open){const bar=$('#exportbar'),fab=$('#exFab');bar.classL
 $('#exFab').addEventListener('click',()=>setExportBar(true));
 $('#barClose').addEventListener('click',()=>setExportBar(false));
 $('#plantToggle').addEventListener('click',()=>$('#plantbar').classList.toggle('open'));
+$('#appUpdate').addEventListener('click',async()=>{
+  if(!confirm('最新版に更新します。未送信の入力があれば先に同期します。よろしいですか？'))return;
+  const b=$('#appUpdate');b.disabled=true;b.textContent='更新中…';
+  try{if(HAS_BACKEND&&SESSION){flushAll();await pullLoop();}}catch(e){}
+  try{if('serviceWorker' in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs){try{await r.update();}catch(e){}try{await r.unregister();}catch(e){}}}}catch(e){}
+  try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}}catch(e){}
+  location.reload(true);
+});
 // 入力設定（移動方向・負荷量・保存等）の開閉
 $('#toolToggle').addEventListener('click',()=>{const tb=$('#toolbar'),btn=$('#toolToggle');const open=tb.classList.contains('collapsed');tb.classList.toggle('collapsed',!open);btn.classList.toggle('on',open);btn.textContent=open?'⚙ 入力設定 ▴':'⚙ 入力設定 ▾';});
 // 出力実行後はスマホでは自動で閉じる（入力に戻りやすく）
