@@ -564,8 +564,29 @@ $('#uSave').addEventListener('click',saveUser);
 $('#loginForm').addEventListener('submit',e=>{e.preventDefault();doLogin();});
 
 // ===== 認証UI =====
-function showLogin(){$('#authOverlay').classList.add('show');$('#authNote').textContent=HAS_BACKEND?'':'※config.js 未設定のためローカル単体で動作中';setTimeout(()=>$('#loginId')?.focus(),50);}
-function hideLogin(){$('#authOverlay').classList.remove('show');}
+let loginShown=false;
+function showLogin(){
+  $('#authOverlay').classList.add('show');
+  $('#authNote').textContent=HAS_BACKEND?'':'※config.js 未設定のためローカル単体で動作中';
+  if(!loginShown){
+    loginShown=true;
+    setTimeout(()=>{const id=$('#loginId'),pw=$('#loginPw');if(id&&!id.value&&pw&&!pw.value&&document.activeElement!==pw)id.focus();},60);
+  }
+}
+function hideLogin(){loginShown=false;$('#authOverlay').classList.remove('show');}
+// オートフィル等による「PW入力中に勝手にIDへフォーカス移動」を防ぐガード
+(function(){
+  const idf=()=>$('#loginId'),pwf=()=>$('#loginPw');let pwActive=false;
+  document.addEventListener('focusin',e=>{
+    if(e.target===pwf())pwActive=true;
+    else if(e.target===idf()&&pwActive&&pwf()&&pwf().value.length>0){
+      setTimeout(()=>{const p=pwf();if(p){const v=p.value;p.focus();try{p.setSelectionRange(v.length,v.length);}catch(_){}}},0);
+    }
+  });
+  // ユーザーが自分でIDをタップ／Tab移動したときはガード解除（誤爆防止）
+  document.addEventListener('pointerdown',e=>{if(e.target===idf())pwActive=false;});
+  document.addEventListener('keydown',e=>{if(e.target===pwf()&&e.key==='Tab')pwActive=false;});
+})();
 function applyUserUI(){const u=SESSION&&SESSION.user;const adm=!!(u&&u.role==='admin');$('#whoami').textContent=u?`${u.name}`:'';$('#logoutBtn').style.display=u?'':'none';$('#adminBtn').style.display=adm?'':'none';document.querySelectorAll('.admin-only').forEach(el=>{el.style.display=adm?'':'none';});state.user=u?u.name:'';}
 async function doLogin(){
   const id=$('#loginId').value.trim(),pw=$('#loginPw').value;const err=$('#loginErr');err.textContent='';
