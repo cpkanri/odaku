@@ -151,8 +151,14 @@ table.sum tfoot td{background:#eef4f5;font-weight:700;text-align:right;font-fami
 table.sum tfoot td.lab{text-align:center;font-family:var(--jp)}
 table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
 
-.exportbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(255,255,255,.93);backdrop-filter:blur(8px);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(16,40,48,.07)}
+.exportbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(16,40,48,.12);transform:translateY(115%);transition:transform .22s ease;max-height:70vh;overflow-y:auto}
+.exportbar.open{transform:translateY(0)}
 .exportbar .inner{max-width:1220px;margin:0 auto;padding:9px 16px;display:flex;align-items:center;gap:9px 13px;flex-wrap:wrap}
+.exportbar .bar-x{position:absolute;top:6px;right:10px;border:0;background:transparent;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 6px}
+.ex-fab{position:fixed;right:16px;bottom:16px;z-index:31;border:0;border-radius:26px;background:var(--accent);color:#fff;font-family:var(--jp);font-weight:700;font-size:14px;padding:12px 20px;cursor:pointer;box-shadow:0 6px 20px rgba(14,124,134,.4);display:inline-flex;align-items:center;gap:8px;transition:.15s}
+.ex-fab:hover{background:var(--accent-d)}
+.ex-fab .ic{font-size:16px;line-height:1}
+.ex-fab.hide{transform:translateY(140%);opacity:0;pointer-events:none}
 .vstat{font-size:11.5px;color:var(--muted);display:flex;gap:12px;align-items:center}
 .vstat .chip{display:inline-flex;align-items:center;gap:5px;font-weight:700}
 .vstat .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -230,7 +236,8 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
   <div class="panel" id="panel"></div>
 </div>
 
-<div class="exportbar">
+<div class="exportbar" id="exportbar">
+  <button class="bar-x" id="barClose" aria-label="閉じる">×</button>
   <div class="inner">
     <div class="vstat" id="vstat"></div>
     <div class="spacer"></div>
@@ -245,6 +252,7 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     <button class="btn primary" id="exAll">月報まとめて出力（全処理場）</button>
   </div>
 </div>
+<button class="ex-fab" id="exFab"><span class="ic">⬆</span>出力</button>
 <div id="toast"></div>
 
 <!-- ログイン -->
@@ -744,6 +752,12 @@ $('#exSel').addEventListener('click',exportSelected);
 $('#exSummary').addEventListener('click',exportSummary);
 $('#selAll').addEventListener('click',()=>{PLANTS.forEach(p=>selSet.add(p.key));renderSelChips();});
 $('#selClear').addEventListener('click',()=>{selSet.clear();renderSelChips();});
+// 出力バー開閉
+function setExportBar(open){const bar=$('#exportbar'),fab=$('#exFab');bar.classList.toggle('open',open);fab.classList.toggle('hide',open);}
+$('#exFab').addEventListener('click',()=>setExportBar(true));
+$('#barClose').addEventListener('click',()=>setExportBar(false));
+// 出力実行後はスマホでは自動で閉じる（入力に戻りやすく）
+['#exAll','#exSel','#exSummary'].forEach(id=>$(id).addEventListener('click',()=>{if(window.innerWidth<820)setTimeout(()=>setExportBar(false),300);}));
 const selSet=new Set();
 function renderSelChips(){const w=$('#selChips');w.innerHTML='';PLANTS.forEach(p=>{const b=document.createElement('span');b.className='chipsel'+(selSet.has(p.key)?' on':'');b.textContent=p.key;b.onclick=()=>{if(selSet.has(p.key))selSet.delete(p.key);else selSet.add(p.key);renderSelChips();};w.appendChild(b);});}
 function toast(msg,err){const t=$('#toast');t.textContent=msg;t.className='show'+(err?' err':'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='',1900);}
@@ -762,6 +776,7 @@ async function startApp(){
   syncControls();
   if(state.plant&&state.plant!=='__sum__')selSet.add(state.plant);else selSet.add(PLANTS[0].key);
   renderTabs();renderSelChips();renderPanel();renderVStat();
+  setExportBar(window.innerWidth>=820);
   applyUserUI();
   if('serviceWorker' in navigator){try{await navigator.serviceWorker.register('sw.js');}catch(e){}}
   if(!HAS_BACKEND){setSync('local');showLogin();return;}            // サーバー未設定: ローカル単体
