@@ -25,7 +25,7 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--jp);font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
-.wrap{max-width:1220px;margin:0 auto;padding:18px 16px 92px}
+.wrap{max-width:1220px;margin:0 auto;padding:18px 16px 22px}
 .app-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
 .app-head .title{display:flex;align-items:center;gap:11px}
 .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(150deg,var(--accent),var(--accent-d));position:relative;flex:none;box-shadow:var(--shadow)}
@@ -126,7 +126,14 @@ h1{font-size:17px;margin:0;letter-spacing:.02em;font-weight:700}
 .metanote{font-size:11px;color:var(--warn-b);padding:6px 14px;background:#fffbeb;border-bottom:1px solid var(--line2);display:none}
 .metanote.show{display:block}
 
-.grid-scroll{overflow:auto;max-height:60vh}
+.grid-scroll{overflow:auto;max-height:72vh}
+/* 全画面（表だけに集中） */
+.fs-btn{position:fixed;left:16px;bottom:16px;z-index:31;border:0;border-radius:26px;background:#37606a;color:#fff;font-family:var(--jp);font-weight:700;font-size:14px;padding:12px 18px;cursor:pointer;box-shadow:0 6px 20px rgba(16,40,48,.32)}
+.fs-btn:hover{background:#2b4d55}
+body.fs .app-head,body.fs .statusbar,body.fs .toolbar,body.fs .plantbar,body.fs .meta-head,body.fs .meta,body.fs .metanote,body.fs .notes{display:none!important}
+body.fs .wrap{max-width:none;padding:6px 8px 8px}
+body.fs .panel{border-radius:8px}
+body.fs .grid-scroll{max-height:calc(100vh - 56px)}
 table{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
 thead th{position:sticky;top:0;z-index:3;background:#eef4f5;color:var(--ink);font-weight:700;font-size:11.5px;border-bottom:1px solid var(--line);border-right:1px solid var(--line2);padding:6px 4px;text-align:center;white-space:nowrap}
 thead tr.g2 th{top:30px;font-size:10.5px;color:var(--muted);font-weight:600}
@@ -290,6 +297,7 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
   </div>
 </div>
 <button class="ex-fab" id="exFab"><span class="ic">⬆</span>出力</button>
+<button class="fs-btn" id="fsBtn">⛶ 全画面</button>
 <div id="toast"></div>
 
 <!-- ログイン -->
@@ -829,6 +837,7 @@ function setExportBar(open){const bar=$('#exportbar'),fab=$('#exFab');bar.classL
 $('#exFab').addEventListener('click',()=>setExportBar(true));
 $('#barClose').addEventListener('click',()=>setExportBar(false));
 $('#plantToggle').addEventListener('click',()=>$('#plantbar').classList.toggle('open'));
+$('#fsBtn').addEventListener('click',()=>{const on=document.body.classList.toggle('fs');$('#fsBtn').textContent=on?'⛶ 解除':'⛶ 全画面';});
 $('#appUpdate').addEventListener('click',async()=>{
   if(!confirm('最新版に更新します。未送信の入力があれば先に同期します。よろしいですか？'))return;
   const b=$('#appUpdate');b.disabled=true;b.textContent='更新中…';
