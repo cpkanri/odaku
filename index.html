@@ -255,9 +255,9 @@ table.sum td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
     </div>
     <span class="hint">Enterで設定方向に移動／Tab=右／↑↓←→</span>
     <div class="spacer"></div>
-    <button class="ghost" id="saveJson">下書き保存</button>
-    <button class="ghost" id="loadJson">読込</button>
-    <button class="ghost warn" id="clearOne">月クリア</button>
+    <button class="ghost admin-only" id="saveJson" style="display:none">下書き保存</button>
+    <button class="ghost admin-only" id="loadJson" style="display:none">読込</button>
+    <button class="ghost warn admin-only" id="clearOne" style="display:none">月クリア</button>
     <input type="file" id="jsonFile" accept=".json" style="display:none">
   </div>
 
@@ -543,7 +543,7 @@ $('#loginPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 // ===== 認証UI =====
 function showLogin(){$('#authOverlay').classList.add('show');$('#authNote').textContent=HAS_BACKEND?'':'※config.js 未設定のためローカル単体で動作中';setTimeout(()=>$('#loginId')?.focus(),50);}
 function hideLogin(){$('#authOverlay').classList.remove('show');}
-function applyUserUI(){const u=SESSION&&SESSION.user;$('#whoami').textContent=u?`${u.name}`:'';$('#logoutBtn').style.display=u?'':'none';$('#adminBtn').style.display=(u&&u.role==='admin')?'':'none';state.user=u?u.name:'';}
+function applyUserUI(){const u=SESSION&&SESSION.user;const adm=!!(u&&u.role==='admin');$('#whoami').textContent=u?`${u.name}`:'';$('#logoutBtn').style.display=u?'':'none';$('#adminBtn').style.display=adm?'':'none';document.querySelectorAll('.admin-only').forEach(el=>{el.style.display=adm?'':'none';});state.user=u?u.name:'';}
 async function doLogin(){
   const id=$('#loginId').value.trim(),pw=$('#loginPw').value;const err=$('#loginErr');err.textContent='';
   if(!HAS_BACKEND){err.textContent='サーバー未設定（config.js）。';return;}
