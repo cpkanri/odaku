@@ -412,7 +412,11 @@ function yearWaterStats(fy,plant){
 function filledDays(fy,plant,month){const recs=getRecs(fy,plant,month);const dim=daysInMonth(monthYear(fy,month),month);let n=0;for(let d=0;d<dim;d++){if(FIELDS.some(f=>f.kind!=='load'&&(recs[d][f.col]??'')!==''))n++;}return n;}
 
 function autoLoad(rec,lc){const f=FIELDS.find(x=>x.col===lc);const flow=parseFloat(rec.E),conc=parseFloat(rec[f.conc]);if(isFinite(flow)&&flow>0&&isFinite(conc))return round(conc*flow/1000,f.dp);return null;}
-function cellDisplay(rec,col){if(state.autocalc){const f=FIELDS.find(x=>x.col===col);if(f.kind==='load'){const v=autoLoad(rec,col);return v===null?'':String(v);}}return rec[col]??'';}
+// 列の小数桁数に合わせて表示整形（末尾0を補う。桁より細かい入力は精度を保持）
+function fmtDp(val,dp){if(dp==null)return val==null?'':String(val);const s=String(val==null?'':val).trim();if(s==='')return '';const n=parseFloat(s);if(!isFinite(n))return s;const dec=(s.split('.')[1]||'').length;return dec<=dp?n.toFixed(dp):s;}
+function dpOf(col){const f=FIELDS.find(x=>x.col===col);return f?f.dp:null;}
+function displayNum(rec,col){const f=FIELDS.find(x=>x.col===col);if(!f||f.kind==='text')return rec[col]??'';return fmtDp(rec[col],f.dp);}
+function cellDisplay(rec,col){if(state.autocalc){const f=FIELDS.find(x=>x.col===col);if(f.kind==='load'){const v=autoLoad(rec,col);return v===null?'':v.toFixed(f.dp);}}return rec[col]??'';}
 function cellOut(rec,col){if(col==='L'){const t=(rec.L??'').toString().trim();return t===''?null:t;}if(state.autocalc){const f=FIELDS.find(x=>x.col===col);if(f.kind==='load')return autoLoad(rec,col);}const v=parseFloat(rec[col]);return isFinite(v)?v:null;}
 function concMismatch(rec,concCol){const f=FIELDS.find(x=>x.col===concCol);const lc=f.load;const flow=parseFloat(rec.E);let load;if(state.autocalc)load=autoLoad(rec,lc);else load=parseFloat(rec[lc]);const conc=parseFloat(rec[concCol]);if(!(isFinite(flow)&&flow>0&&isFinite(load)&&isFinite(conc)&&load!==0))return false;const lo=load*0.95*1000/flow,hi=load*1.05*1000/flow;return conc<Math.min(lo,hi)||conc>Math.max(lo,hi);}
 function overLimit(rec,col){const lim=LIMIT[col];if(lim==null)return false;const v=state.autocalc&&FIELDS.find(x=>x.col===col).kind==='load'?autoLoad(rec,col):parseFloat(rec[col]);return isFinite(v)&&v>lim;}
@@ -513,7 +517,7 @@ function renderGrid(){
       td.className=(isText?'tcol ':'')+(f.kind==='flow'?'flow ':'')+((ro||!active)?'ro':'');
       const inp=document.createElement('input');inp.type='text';inp.inputMode=isText?'text':'decimal';
       inp.dataset.d=d;inp.dataset.col=f.col;
-      inp.value=active?(ro?cellDisplay(rec,f.col):(rec[f.col]??'')):'';
+      inp.value=active?(ro?cellDisplay(rec,f.col):(isText?(rec[f.col]??''):displayNum(rec,f.col))):'';
       if(ro||!active){inp.readOnly=true;inp.tabIndex=-1;}
       inp.addEventListener('input',onInput);inp.addEventListener('keydown',onKey);
       inp.addEventListener('paste',onPaste);inp.addEventListener('focus',e=>e.target.select());
@@ -541,7 +545,10 @@ function nextCell(d,col){
 // iPhone等: キーボードの「決定(✓)」でキーボードが閉じたら、設定方向の次セルへ自動移動
 let advancing=false;
 function onCellBlur(e){
-  const inp=e.target;const val=inp.value;
+  const inp=e.target;const col=inp.dataset.col,d=+inp.dataset.d;const dp=dpOf(col);
+  // 桁数整形（末尾0補完）。数値セルのみ。
+  if(dp!=null&&(inp.value??'')!==''){const nv=fmtDp(inp.value,dp);if(nv!==inp.value){inp.value=nv;const recs=getRecs(state.fy,state.plant,state.month);if((recs[d][col]??'')!==nv){recs[d][col]=nv;markDirty(state.plant,state.month,d);scheduleFlush(state.plant,state.month);refreshRow(d);renderTabs();saveCacheSoon();}}}
+  const val=inp.value;
   setTimeout(()=>{
     if(advancing)return;
     const ae=document.activeElement;
